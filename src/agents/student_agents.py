@@ -20,12 +20,22 @@ class SimpleReflexAgent(Agent):
         self.rng = random.Random(seed)
 
     def act(self, perception: Perception) -> Action:
+        # Dicas:
+        # - use perception.cell_at((row, col)) para consultar células visíveis;
+        # - use perception.position para obter a posição atual;
+        # - use perception.battery e perception.max_battery para gerenciar a bateria;
+        # - use perception.on_victim, perception.on_charger e perception.on_exit para ações especiais;
+        # - use perception.rescued e perception.total_victims para monitorar o progresso do resgate.
+
+        # identifica se está sobre uma vítima e resgata
         if perception.on_victim:
             return Action.RESCUE
 
+        # identifica se está sobre um carregador e recarrega
         if perception.on_charger and perception.battery < perception.max_battery:
             return Action.RECHARGE
 
+        # identifica os vizinhos e verifica se são seguros (não são paredes ou perigos)
         neighbors = {
             Action.NORTH: (perception.position[0] - 1, perception.position[1]),
             Action.SOUTH: (perception.position[0] + 1, perception.position[1]),
@@ -37,14 +47,12 @@ class SimpleReflexAgent(Agent):
             cell = perception.cell_at(neighbors[action])
             return cell is not None and cell not in {Cell.WALL, Cell.HAZARD}
 
-        visible_victim = [
-            action
-            for action in MOVEMENT_ACTIONS
-            if is_safe(action) and perception.cell_at(neighbors[action]) == Cell.VICTIM
-        ]
+        # prioriza ações que levam a vítimas visíveis
+        visible_victim = [action for action in MOVEMENT_ACTIONS if is_safe(action) and perception.cell_at(neighbors[action]) == Cell.VICTIM]
         if visible_victim:
             return visible_victim[0]
 
+        # prioriza ações que levam a carregadores visíveis se a bateria estiver baixa
         if perception.battery < perception.max_battery // 3:
             visible_charger = [
                 action
@@ -54,6 +62,7 @@ class SimpleReflexAgent(Agent):
             if visible_charger:
                 return visible_charger[0]
 
+        # prioriza ações que levam a saída visível se todas as vítimas foram resgatadas
         for action in MOVEMENT_ACTIONS:
             if is_safe(action):
                 return action
