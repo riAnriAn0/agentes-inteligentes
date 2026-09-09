@@ -20,9 +20,45 @@ class SimpleReflexAgent(Agent):
         self.rng = random.Random(seed)
 
     def act(self, perception: Perception) -> Action:
-        # TODO: regras condição -> ação.
-        # Não use memória, mapa interno, visitados ou Q-table.
-        raise NotImplementedError("Implemente SimpleReflexAgent.act().")
+        if perception.on_victim:
+            return Action.RESCUE
+
+        if perception.on_charger and perception.battery < perception.max_battery:
+            return Action.RECHARGE
+
+        neighbors = {
+            Action.NORTH: (perception.position[0] - 1, perception.position[1]),
+            Action.SOUTH: (perception.position[0] + 1, perception.position[1]),
+            Action.EAST: (perception.position[0], perception.position[1] + 1),
+            Action.WEST: (perception.position[0], perception.position[1] - 1),
+        }
+
+        def is_safe(action: Action) -> bool:
+            cell = perception.cell_at(neighbors[action])
+            return cell is not None and cell not in {Cell.WALL, Cell.HAZARD}
+
+        visible_victim = [
+            action
+            for action in MOVEMENT_ACTIONS
+            if is_safe(action) and perception.cell_at(neighbors[action]) == Cell.VICTIM
+        ]
+        if visible_victim:
+            return visible_victim[0]
+
+        if perception.battery < perception.max_battery // 3:
+            visible_charger = [
+                action
+                for action in MOVEMENT_ACTIONS
+                if is_safe(action) and perception.cell_at(neighbors[action]) == Cell.CHARGER
+            ]
+            if visible_charger:
+                return visible_charger[0]
+
+        for action in MOVEMENT_ACTIONS:
+            if is_safe(action):
+                return action
+
+        return Action.WAIT
 
     def reset(self) -> None:
         pass
