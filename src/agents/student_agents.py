@@ -89,16 +89,46 @@ class ModelBasedAgent(Agent):
         self.last_action: Action | None = None
 
     def _update_model(self, perception: Perception) -> None:
-        # TODO: atualize known_map, visit_count etc.
-        pass
+        self.known_map.update(perception.visible_cells)
+        self.visit_count[perception.position] += 1
 
     def act(self, perception: Perception) -> Action:
-        # TODO:
-        # 1. atualize o modelo interno;
-        # 2. trate resgate/recarga;
-        # 3. prefira células pouco visitadas;
-        # 4. evite paredes e perigos conhecidos.
-        raise NotImplementedError("Implemente ModelBasedAgent.act().")
+        self._update_model(perception)
+
+        if perception.on_victim:
+            action = Action.RESCUE
+        elif perception.on_charger and perception.battery < perception.max_battery:
+            action = Action.RECHARGE
+        else:
+            neighbors = {
+                Action.NORTH: (perception.position[0] - 1, perception.position[1]),
+                Action.SOUTH: (perception.position[0] + 1, perception.position[1]),
+                Action.EAST: (perception.position[0], perception.position[1] + 1),
+                Action.WEST: (perception.position[0], perception.position[1] - 1),
+            }
+
+            def cell_for(action: Action) -> Cell | None:
+                position = neighbors[action]
+                return perception.cell_at(position) or self.known_map.get(position)
+
+            def is_safe(action: Action) -> bool:
+                cell = cell_for(action)
+                return cell is not None and cell not in {Cell.WALL, Cell.HAZARD}
+
+            available = [action for action in MOVEMENT_ACTIONS if is_safe(action)]
+            if not available:
+                action = Action.WAIT
+            else:
+                action = min(
+                    available,
+                    key=lambda candidate: (
+                        self.visit_count.get(neighbors[candidate], 0),
+                        MOVEMENT_ACTIONS.index(candidate),
+                    ),
+                )
+
+        self.last_action = action
+        return action
 
     def diagnostics(self) -> dict[str, Any]:
         return {
