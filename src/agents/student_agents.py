@@ -159,22 +159,78 @@ class LearningAgent(Agent):
         pass
 
     def _state(self, perception: Perception) -> Any:
-        # TODO: crie uma representação compacta do estado.
-        raise NotImplementedError("Implemente LearningAgent._state().")
+        row, column = perception.position
+        neighbors = (
+            perception.cell_at((row - 1, column)),
+            perception.cell_at((row + 1, column)),
+            perception.cell_at((row, column - 1)),
+            perception.cell_at((row, column + 1)),
+        )
+        battery_bucket = min(
+            4,
+            (perception.battery * 5) // max(1, perception.max_battery),
+        )
+        return (
+            perception.position,
+            battery_bucket,
+            tuple(cell.value if cell is not None else None for cell in neighbors),
+            perception.on_victim,
+            perception.on_charger,
+            perception.on_exit,
+            perception.rescued,
+            perception.total_victims,
+        )
 
     def _available_actions(self, perception: Perception) -> list[Action]:
-        # TODO: filtre ações claramente inválidas usando a percepção atual.
-        raise NotImplementedError("Implemente LearningAgent._available_actions().")
+        row, column = perception.position
+        neighbors = {
+            Action.NORTH: (row - 1, column),
+            Action.SOUTH: (row + 1, column),
+            Action.EAST: (row, column + 1),
+            Action.WEST: (row, column - 1),
+        }
+        actions = [
+            action
+            for action in MOVEMENT_ACTIONS
+            if perception.cell_at(neighbors[action]) not in {Cell.WALL, Cell.HAZARD}
+        ]
+        if perception.on_victim:
+            actions.append(Action.RESCUE)
+        if perception.on_charger and perception.battery < perception.max_battery:
+            actions.append(Action.RECHARGE)
+        actions.append(Action.WAIT)
+        return actions
 
     def act(self, perception: Perception) -> Action:
-        # TODO: política epsilon-greedy usando self.exploration_rate.
-        raise NotImplementedError("Implemente LearningAgent.act().")
+        state = self._state(perception)
+        actions = self._available_actions(perception)
+        if self.rng.random() < self.exploration_rate:
+            return self.rng.choice(actions)
+
+        values = [self.q.get((state, action), 0.0) for action in actions]
+        best_value = max(values)
+        return next(
+            action for action, value in zip(actions, values) if value == best_value
+        )
 
     def observe_transition(self, transition: Transition) -> None:
         if not self.training:
             return
-        # TODO: atualização Q-learning.
-        raise NotImplementedError("Implemente LearningAgent.observe_transition().")
+        state = self._state(transition.perception)
+        key = (state, transition.action)
+        current_value = self.q[key]
+
+        future_value = 0.0
+        if not transition.done:
+            next_state = self._state(transition.next_perception)
+            next_actions = self._available_actions(transition.next_perception)
+            future_value = max(
+                (self.q.get((next_state, action), 0.0) for action in next_actions),
+                default=0.0,
+            )
+
+        target = transition.reward + self.gamma * future_value
+        self.q[key] = current_value + self.alpha * (target - current_value)
 
     def diagnostics(self) -> dict[str, Any]:
         return {
