@@ -96,36 +96,37 @@ class ModelBasedAgent(Agent):
         self._update_model(perception)
 
         if perception.on_victim:
-            action = Action.RESCUE
-        elif perception.on_charger and perception.battery < perception.max_battery:
-            action = Action.RECHARGE
+            return Action.RESCUE
+
+        if perception.on_charger and perception.battery < perception.max_battery:
+            return Action.RECHARGE
+        
+        neighbors = {
+            Action.NORTH: (perception.position[0] - 1, perception.position[1]),
+            Action.SOUTH: (perception.position[0] + 1, perception.position[1]),
+            Action.EAST: (perception.position[0], perception.position[1] + 1),
+            Action.WEST: (perception.position[0], perception.position[1] - 1),
+        }
+
+        def cell_for(action: Action) -> Cell | None:
+            position = neighbors[action]
+            return perception.cell_at(position) or self.known_map.get(position)
+
+        def is_safe(action: Action) -> bool:
+            cell = cell_for(action)
+            return cell is not None and cell not in {Cell.WALL, Cell.HAZARD}
+
+        available = [action for action in MOVEMENT_ACTIONS if is_safe(action)]
+        if not available:
+            action = Action.WAIT
         else:
-            neighbors = {
-                Action.NORTH: (perception.position[0] - 1, perception.position[1]),
-                Action.SOUTH: (perception.position[0] + 1, perception.position[1]),
-                Action.EAST: (perception.position[0], perception.position[1] + 1),
-                Action.WEST: (perception.position[0], perception.position[1] - 1),
-            }
-
-            def cell_for(action: Action) -> Cell | None:
-                position = neighbors[action]
-                return perception.cell_at(position) or self.known_map.get(position)
-
-            def is_safe(action: Action) -> bool:
-                cell = cell_for(action)
-                return cell is not None and cell not in {Cell.WALL, Cell.HAZARD}
-
-            available = [action for action in MOVEMENT_ACTIONS if is_safe(action)]
-            if not available:
-                action = Action.WAIT
-            else:
-                action = min(
-                    available,
-                    key=lambda candidate: (
-                        self.visit_count.get(neighbors[candidate], 0),
-                        MOVEMENT_ACTIONS.index(candidate),
-                    ),
-                )
+            action = min(
+                available,
+                key=lambda candidate: (
+                    self.visit_count.get(neighbors[candidate], 0),
+                    MOVEMENT_ACTIONS.index(candidate),
+                ),
+            )
 
         self.last_action = action
         return action
@@ -135,7 +136,6 @@ class ModelBasedAgent(Agent):
             "known_cells": len(self.known_map),
             "visited_cells": len(self.visit_count),
         }
-
 
 class LearningAgent(Agent):
     """OBRIGATÓRIO: sugestão de implementação com Q-learning tabular."""
