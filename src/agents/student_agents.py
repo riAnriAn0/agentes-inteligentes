@@ -12,30 +12,18 @@ MOVEMENT_ACTIONS = [Action.NORTH, Action.SOUTH, Action.EAST, Action.WEST]
 
 
 class SimpleReflexAgent(Agent):
-    """OBRIGATÓRIO: usar somente a percepção atual."""
-
     name = "simple"
 
     def __init__(self, seed: int = 0) -> None:
         self.rng = random.Random(seed)
 
     def act(self, perception: Perception) -> Action:
-        # Dicas:
-        # - use perception.cell_at((row, col)) para consultar células visíveis;
-        # - use perception.position para obter a posição atual;
-        # - use perception.battery e perception.max_battery para gerenciar a bateria;
-        # - use perception.on_victim, perception.on_charger e perception.on_exit para ações especiais;
-        # - use perception.rescued e perception.total_victims para monitorar o progresso do resgate.
-
-        # identifica se está sobre uma vítima e resgata
         if perception.on_victim:
             return Action.RESCUE
 
-        # identifica se está sobre um carregador e recarrega
         if perception.on_charger and perception.battery < perception.max_battery:
             return Action.RECHARGE
 
-        # identifica os vizinhos e verifica se são seguros (não são paredes ou perigos)
         neighbors = {
             Action.NORTH: (perception.position[0] - 1, perception.position[1]),
             Action.SOUTH: (perception.position[0] + 1, perception.position[1]),
@@ -47,12 +35,10 @@ class SimpleReflexAgent(Agent):
             cell = perception.cell_at(neighbors[action])
             return cell is not None and cell not in {Cell.WALL, Cell.HAZARD}
 
-        # prioriza ações que levam a vítimas visíveis
         visible_victim = [action for action in MOVEMENT_ACTIONS if is_safe(action) and perception.cell_at(neighbors[action]) == Cell.VICTIM]
         if visible_victim:
             return visible_victim[0]
 
-        # prioriza ações que levam a carregadores visíveis se a bateria estiver baixa
         if perception.battery < perception.max_battery // 3:
             visible_charger = [
                 action
@@ -62,7 +48,6 @@ class SimpleReflexAgent(Agent):
             if visible_charger:
                 return visible_charger[0]
 
-        # prioriza ações que levam a saída visível se todas as vítimas foram resgatadas
         for action in MOVEMENT_ACTIONS:
             if is_safe(action):
                 return action
@@ -74,8 +59,6 @@ class SimpleReflexAgent(Agent):
 
 
 class ModelBasedAgent(Agent):
-    """OBRIGATÓRIO: manter estado interno, sem exigir busca."""
-
     name = "model"
 
     def __init__(self, seed: int = 0) -> None:
@@ -83,7 +66,6 @@ class ModelBasedAgent(Agent):
         self.reset()
 
     def reset(self) -> None:
-        # TODO: adapte ou amplie a memória conforme sua estratégia.
         self.known_map: dict[tuple[int, int], Cell] = {}
         self.visit_count: dict[tuple[int, int], int] = defaultdict(int)
         self.last_action: Action | None = None
@@ -138,8 +120,6 @@ class ModelBasedAgent(Agent):
         }
 
 class LearningAgent(Agent):
-    """OBRIGATÓRIO: sugestão de implementação com Q-learning tabular."""
-
     name = "learning"
 
     def __init__(
@@ -164,7 +144,6 @@ class LearningAgent(Agent):
         return self.epsilon if self.training else self.evaluation_epsilon
 
     def reset(self) -> None:
-        # Não apague self.q: o conhecimento deve persistir entre episódios.
         pass
 
     def _state(self, perception: Perception) -> Any:
@@ -254,8 +233,6 @@ class LearningAgent(Agent):
 
 
 class GoalBasedAgent(Agent):
-    """OPCIONAL: recomendado após busca/planejamento."""
-
     name = "goal"
 
     def __init__(self, seed: int = 0) -> None:
@@ -266,8 +243,6 @@ class GoalBasedAgent(Agent):
 
 
 class UtilityBasedAgent(Agent):
-    """OPCIONAL: recomendado após busca e funções de utilidade."""
-
     name = "utility"
 
     def __init__(self, seed: int = 0) -> None:
